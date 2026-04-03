@@ -1,4 +1,5 @@
 const Project = require('../models/project.model');
+const Version = require('../models/version.model');
 const { deleteProjectFiles } = require('../../../shared/utils/upload');
 const logger = require('../../../shared/utils/logger');
 
@@ -14,7 +15,6 @@ const createProject = async ({ userId, name, originalImage }) => {
   return project;
 };
 
-// Get all projects for a user
 const getUserProjects = async (userId, { page = 1, limit = 12, status = 'active' }) => {
   const skip = (page - 1) * limit;
 
@@ -53,7 +53,6 @@ const getProjectById = async (projectId, userId) => {
   return project;
 };
 
-
 const updateProject = async (projectId, userId, updates) => {
   const project = await Project.findOneAndUpdate(
     { _id: projectId, userId },
@@ -79,6 +78,8 @@ const deleteProject = async (projectId, userId) => {
     throw error;
   }
 
+  await Version.deleteMany({ projectId });
+
   await Project.deleteOne({ _id: projectId });
 
   await deleteProjectFiles(userId.toString(), projectId.toString(), project.originalImage);
@@ -87,11 +88,48 @@ const deleteProject = async (projectId, userId) => {
   return true;
 };
 
+const createVersion = async ({ projectId, beforeImage, prompt, beforePrompt = null }) => {
+  const version = await Version.create({
+    projectId,
+    beforeImage,
+    beforePrompt,
+    prompt,
+    status: 'pending'
+  });
+
+  logger.info(`Version created: ${version._id} for project ${projectId}`);
+  return version;
+};
+
+const getProjectVersions = async (projectId) => {
+  return Version.find({ projectId })
+    .sort({ createdAt: -1 });
+};
+
+const getVersionById = async (versionId) => {
+  const version = await Version.findById(versionId);
+
+  if (!version) {
+    const error = new Error('Version not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return version;
+};
+
+const updateVersion = async (versionId, updates) => {
+  return Version.findByIdAndUpdate(versionId, updates, { new: true });
+};
 
 module.exports = {
   createProject,
   getUserProjects,
   getProjectById,
   updateProject,
-  deleteProject
+  deleteProject,
+  createVersion,
+  getProjectVersions,
+  getVersionById,
+  updateVersion
 };
