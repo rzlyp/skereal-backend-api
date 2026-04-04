@@ -1,5 +1,7 @@
 const projectService = require('../services/project.service');
 const { urlPathToAbsolute } = require('../../../shared/utils/upload');
+const {validateFashionContext} = require('../services/gemini.service');
+
 const logger = require('../../../shared/utils/logger');
 const fs = require('fs');
 
@@ -13,6 +15,14 @@ const createProject = async (req, res, next) => {
       return res.status(400).json({ error: 'Sketch image is required' });
     }
 
+     const imageBuffer = fs.readFileSync(req.file.path);
+      const sketchBase64 = imageBuffer.toString('base64');
+
+      await validateFashionContext(sketchBase64, prompt).then(({ valid, reason }) => {
+        if (!valid) {
+          throw new Error(`It looks like this image or prompt isn't related to fashion. To get the best results, please try uploading a sketch of a garment or an outfit.`);
+        }
+      })
 
     const originalImage = `/uploads/projects/${userId}/${req.file.filename}`;
 
