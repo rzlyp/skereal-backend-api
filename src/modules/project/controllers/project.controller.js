@@ -1,10 +1,9 @@
 const projectService = require('../services/project.service');
+const { getImageGenerationQueue } = require('../../queue');
 const { urlPathToAbsolute } = require('../../../shared/utils/upload');
 const {validateFashionContext} = require('../services/gemini.service');
-
 const logger = require('../../../shared/utils/logger');
 const fs = require('fs');
-
 
 const createProject = async (req, res, next) => {
   try {
@@ -15,14 +14,14 @@ const createProject = async (req, res, next) => {
       return res.status(400).json({ error: 'Sketch image is required' });
     }
 
-     const imageBuffer = fs.readFileSync(req.file.path);
-      const sketchBase64 = imageBuffer.toString('base64');
+    const imageBuffer = fs.readFileSync(req.file.path);
+    const sketchBase64 = imageBuffer.toString('base64');
 
-      await validateFashionContext(sketchBase64, prompt).then(({ valid, reason }) => {
-        if (!valid) {
-          throw new Error(`It looks like this image or prompt isn't related to fashion. To get the best results, please try uploading a sketch of a garment or an outfit.`);
-        }
-      })
+    await validateFashionContext(sketchBase64, prompt).then(({ valid, reason }) => {
+      if (!valid) {
+        throw new Error(`It looks like this image or prompt isn't related to fashion. To get the best results, please try uploading a sketch of a garment or an outfit.`);
+      }
+    })
 
     const originalImage = `/uploads/projects/${userId}/${req.file.filename}`;
 
@@ -41,6 +40,19 @@ const createProject = async (req, res, next) => {
       currentVersionId: version._id
     });
 
+    const queue = getImageGenerationQueue();
+    const job = await queue.add('generate-image', {
+      versionId: version._id.toString(),
+      projectId: project._id.toString(),
+      userId: userId.toString(),
+      sketchPath: req.file.path,
+      prompt
+    });
+
+    await projectService.updateVersion(version._id, {
+      jobId: job.id,
+      status: 'pending'
+    });
 
     logger.info(`Generation job created: ${job.id} for version ${version._id}`);
 
@@ -109,6 +121,7 @@ const getProjectVersions = async (req, res, next) => {
     const { id } = req.params;
     const userId = req.user._id;
 
+    // Verify project ownership
     await projectService.getProjectById(id, userId);
 
     const versions = await projectService.getProjectVersions(id);
@@ -148,6 +161,22 @@ const createVersion = async (req, res, next) => {
       prompt
     });
 
+    const queue = getImageGenerationQueue();
+    const job = await queue.add('generate-image', {
+      versionId: version._id.toString(),
+      projectId: id,
+      userId: userId.toString(),
+      sketchPath: urlPathToAbsolute(beforeImage),
+      prompt
+    });
+
+    await projectService.updateVersion(version._id, {
+      jobId: job.id
+    });
+
+    await projectService.updateProject(id, userId, {
+      currentVersionId: version._id
+    });
 
     logger.info(`Regeneration job created: ${job.id} for version ${version._id}`);
 
@@ -163,7 +192,6 @@ const createVersion = async (req, res, next) => {
   }
 };
 
-// GET /api/versions/:id - Get version details
 const getVersion = async (req, res, next) => {
   try {
     const { id } = req.params;
