@@ -45,12 +45,19 @@ const versionSchema = new mongoose.Schema({
   timestamps: true
 });
 
+const toAbsolute = (path) => {
+  if (!path || path.startsWith('http')) return path;
+  return `${process.env.BACKEND_URL || ''}${path}`;
+};
+
 versionSchema.set('toJSON', {
   virtuals: true,
   transform: (doc, ret) => {
     ret.id = ret._id;
     delete ret._id;
     delete ret.__v;
+    ret.beforeImage = toAbsolute(ret.beforeImage);
+    ret.afterImage = toAbsolute(ret.afterImage);
     return ret;
   }
 });

@@ -35,12 +35,19 @@ projectSchema.virtual('versions', {
   foreignField: 'projectId'
 });
 
+const toAbsolute = (path) => {
+  if (!path || path.startsWith('http')) return path;
+  return `${process.env.BACKEND_URL || ''}${path}`;
+};
+
 projectSchema.set('toJSON', {
   virtuals: true,
   transform: (doc, ret) => {
     ret.id = ret._id;
     delete ret._id;
     delete ret.__v;
+    ret.originalImage = toAbsolute(ret.originalImage);
+    ret.thumbnail = toAbsolute(ret.thumbnail);
     return ret;
   }
 });
