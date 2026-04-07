@@ -35,6 +35,10 @@ const startServer = async () => {
 
     setupBullBoard(app);
 
+    app.use((req, res) => {
+      res.status(404).json({ error: 'Not found' });
+    });
+
     startWorker(processImageGeneration);
     logger.info('Image generation worker started');
 

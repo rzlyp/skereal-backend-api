@@ -93,7 +93,10 @@ const setupBullBoard = (app) => {
   });
 
   if (process.env.NODE_ENV !== 'production') {
-    app.use('/admin/queues', serverAdapter.getRouter());
+    app.use('/admin/queues', (req, res, next) => {
+      res.removeHeader('Content-Security-Policy');
+      next();
+    }, serverAdapter.getRouter());
     logger.info('Bull Board available at /admin/queues');
   }
 };

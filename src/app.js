@@ -42,10 +42,6 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/versions', versionRoutes);
 app.use('/api/gallery', galleryRoutes);
 
-app.use((req, res) => {
-  res.status(404).json({ error: 'Not found' });
-});
-
 app.use(errorHandler);
 
 module.exports = app;
